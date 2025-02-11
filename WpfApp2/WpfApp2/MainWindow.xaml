@@ -9,9 +9,14 @@
         Background="#2B2B2B"
         ResizeMode="CanResizeWithGrip"
         WindowState="Normal">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="30" ResizeBorderThickness="5" />
+    </WindowChrome.WindowChrome>
+    
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="30" />
+            <RowDefinition Height="45" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -32,6 +37,7 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- Toolbar -->
             <!-- Toolbar/Menu -->
             <Menu Grid.Row="0" Background="#525252">
                 <MenuItem Header="File">
@@ -64,19 +70,18 @@
 
                 <!-- 영상 리스트 -->
                 <Border Grid.Column="0" Grid.RowSpan="2" Background="#36443d" BorderBrush="Black" BorderThickness="1">
-                    <TextBlock x:Name="txtFileName" VerticalAlignment="Center" 
-                      
-                       Margin="10,0,0,0"/>
+                    <Expander Header="📹 동영상" IsExpanded="True" DataContext="{Binding}" VerticalAlignment="Top">
+                        <ItemsControl ItemsSource="{Binding MyVideoes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding name}" Margin="5" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
                 </Border>
-
-                <Expander Header="📹 동영상">
-                    <StackPanel>
-                        <TextBlock Text="Camera 2"/>
-                        <TextBlock Text="Camera 3"/>
-                        <TextBlock Text="Camera 4"/>
-                    </StackPanel>
-                </Expander>
-
 
                 <!-- 영상 표시 -->
                 <Border Grid.Column="1" Grid.Row="0" Background="#525252" BorderBrush="Black" BorderThickness="1">
@@ -102,7 +107,7 @@
                               MediaEnded="mediaElement_MediaEnded" />
                         </Grid>
 
-                        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="10,0,10,10" VerticalAlignment="Bottom" Grid.ColumnSpan="2">
+                        <StackPanel x:Name="show_VideoBar" Orientation="Horizontal" Grid.Row="1" Margin="10,0,10,10" Visibility="Hidden" VerticalAlignment="Bottom" Grid.ColumnSpan="2">
                             <!-- 재생/일시정지 버튼 -->
                             <Button x:Name="btnPlayPause" Content="▶" Width="40" 
                             Click="btnPlayPause_Click" />
@@ -142,8 +147,34 @@
 
                 <!-- 영상 길이 -->
                 <Border Grid.Column="1" Grid.Row="1" Grid.ColumnSpan="2" Background="#525252" BorderBrush="Black" BorderThickness="1">
-                    <TextBlock Text="영상 길이" Foreground="White" 
-                               VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    <!--<TextBlock Text="영상 길이" Foreground="White" 
+                               VerticalAlignment="Center" HorizontalAlignment="Center" />-->
+                    <Grid>
+                        <!-- 영상 재생 슬라이더 -->
+                        <Slider x:Name="sliderTimeline"
+            Minimum="0"
+            Maximum="100"
+            ValueChanged="sliderTimeline_ValueChanged"
+            TickPlacement="BottomRight"
+            TickFrequency="10"/>
+
+                        <!-- 썸네일 프레임 리스트 -->
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="thumbnailList" ItemsSource="{Binding Thumbnails}" >
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Image Source="{Binding}" Width="80" Height="45" Margin="2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+
                 </Border>
             </Grid>
         </Grid>

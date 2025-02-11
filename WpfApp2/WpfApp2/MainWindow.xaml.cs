@@ -12,6 +12,8 @@ using Emgu.CV.Structure;
 using Microsoft.Win32;
 using Emgu.CV.CvEnum;
 using System.Windows.Controls;
+using System.Collections.ObjectModel;
+using static WpfApp2.MainWindow;
 
 namespace WpfApp2
 {
@@ -20,48 +22,44 @@ namespace WpfApp2
         private VideoCapture _capture;
         private DispatcherTimer _timer;
         private bool _isPlaying = false; // 재생 상태 파악 (Play/Pause 구분)
+        private MyVideoViewModel _videoViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
+            _videoViewModel = new MyVideoViewModel();
+            this.DataContext = _videoViewModel;
         }
         
-        // Title bar 와 관련된 함수들
-        // 드레그
-        private void Rectangle_MouseDown(object sender, MouseButtonEventArgs e)
+        // Video Object Imformation
+        public class MyVideo
         {
-            this.DragMove();
+            public string name { get; set; }
         }
 
-        // 최소화
-        private void ToMiniButton_Click(object sender, RoutedEventArgs e)
+        // Video List Object
+        public class MyVideoViewModel
         {
-            this.WindowState = System.Windows.WindowState.Minimized;
-        }
+            public ObservableCollection<MyVideo> MyVideoes { get; set; }
 
-        // 최대화 버튼
-        private void ToMaxOrNormalButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == System.Windows.WindowState.Maximized)
+            public MyVideoViewModel() 
             {
-                this.WindowState = System.Windows.WindowState.Normal;
+                MyVideoes = new ObservableCollection<MyVideo>();
             }
-            else if (this.WindowState == System.Windows.WindowState.Normal)
-            {
-                this.WindowState = System.Windows.WindowState.Maximized;
-            }
-        }
 
-        // 닫기 버튼
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
+            public void AddVideo(string fileName)
+            {
+                MyVideo videoItem = new MyVideo();
+                videoItem.name = fileName;
+                MyVideoes.Add(new MyVideo { name = fileName});
+            }
         }
 
         // 영상 재생과 관련된 함수들
         // (1) 영상 선택 버튼
         private void btnSelectVideo_Click(object sender, RoutedEventArgs e)
         {
+
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = "비디오 파일|*.mp4;*.avi;*.mov;*.wmv;*.mkv|모든 파일|*.*"
@@ -81,8 +79,46 @@ namespace WpfApp2
                     mediaElement.Source = new Uri(openFileDialog.FileName);
                     mediaElement.Volume = sliderVolume.Value; // 볼륨 설정
 
+
+                        try
+                        {
+                            // 파일명 추출
+                            string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
+                            Console.WriteLine(fileName);
+
+                            // 파일명이 유효한지 확인
+                            if (string.IsNullOrEmpty(fileName))
+                            {
+                                MessageBox.Show("파일을 선택하지 않았습니다.");
+                                //txtFileName.Text = "Why so serious?";
+                                return;
+                            }
+
+                            // ViewModel이 null인지 확인
+                            if (_videoViewModel == null)
+                            {
+                                _videoViewModel = new MyVideoViewModel(); // 초기화
+                            }
+
+                            // 파일명 추가
+                            _videoViewModel.AddVideo(fileName);
+                            // txtFileName.Text = fileName;
+
+                            // UI에 파일명 표시 (옵션)
+                            // txtFileName.Text = fileName;
+                        }
+                        catch (Exception ex)
+                        {
+                            // 예외 처리 (로그 기록 또는 사용자 알림)
+                            MessageBox.Show($"오류가 발생했습니다: {ex.Message}");
+                            //txtFileName.Text = "Error is coming";
+                        }
+                    
+
                     // 파일명 표시
-                    txtFileName.Text = System.IO.Path.GetFileName(openFileDialog.FileName);
+                    //string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
+                    //_videoViewModel.AddVideo(fileName);
+                    // txtFileName.Text = System.IO.Path.GetFileName(openFileDialog.FileName);
 
                     // 타이머 (약 30fps)
                     if (_timer == null)
@@ -91,6 +127,9 @@ namespace WpfApp2
                         _timer.Interval = TimeSpan.FromMilliseconds(33);
                         _timer.Tick += Timer_Tick;
                     }
+
+                    // 비디오 작동바 가시화
+                    show_VideoBar.Visibility = Visibility.Visible;
 
                     // 재생 시작(수정 -> 첫 장면에서 일시정지)
                     mediaElement.Position = TimeSpan.Zero; // 첫 프레임으로 이동
