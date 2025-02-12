@@ -71,7 +71,7 @@
                 <!-- 영상 리스트 -->
                 <Border Grid.Column="0" Grid.RowSpan="2" Background="#36443d" BorderBrush="Black" BorderThickness="1">
                     <Expander Header="📹 동영상" IsExpanded="True" DataContext="{Binding}" VerticalAlignment="Top">
-                        <ItemsControl ItemsSource="{Binding MyVideoes}">
+                        <ItemsControl ItemsSource="{Binding VideoList.MyVideoes}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel>
@@ -150,17 +150,17 @@
                     <!--<TextBlock Text="영상 길이" Foreground="White" 
                                VerticalAlignment="Center" HorizontalAlignment="Center" />-->
                     <Grid>
-                        <!-- 영상 재생 슬라이더 -->
+                        <!-- 영상 재생 슬라이더 --><!--
                         <Slider x:Name="sliderTimeline"
-            Minimum="0"
-            Maximum="100"
-            ValueChanged="sliderTimeline_ValueChanged"
-            TickPlacement="BottomRight"
-            TickFrequency="10"/>
+                                Minimum="0"
+                                Maximum="100"
+                                ValueChanged="sliderTimeline_ValueChanged"
+                                TickPlacement="BottomRight"
+                                TickFrequency="10"/>-->
 
                         <!-- 썸네일 프레임 리스트 -->
                         <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Auto">
-                            <ItemsControl x:Name="thumbnailList" ItemsSource="{Binding Thumbnails}" >
+                            <ItemsControl ItemsSource="{Binding VideoEditor.Thumbnails}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Orientation="Horizontal"/>
@@ -168,7 +168,8 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Image Source="{Binding}" Width="80" Height="45" Margin="2"/>
+                                        <Image Source="{Binding Image}" Width="80" Height="45" Margin="2"
+                                               Cursor="Hand" MouseLeftButtonDown="Thumbnail_Click"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>

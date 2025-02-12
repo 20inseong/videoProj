@@ -14,6 +14,8 @@ using Emgu.CV.CvEnum;
 using System.Windows.Controls;
 using System.Collections.ObjectModel;
 using static WpfApp2.MainWindow;
+using System.Drawing.Imaging;
+using System.IO;
 
 namespace WpfApp2
 {
@@ -22,15 +24,32 @@ namespace WpfApp2
         private VideoCapture _capture;
         private DispatcherTimer _timer;
         private bool _isPlaying = false; // 재생 상태 파악 (Play/Pause 구분)
-        private MyVideoViewModel _videoViewModel;
+        private MainViewModel _mainViewModel;
+        //private MyVideoViewModel _videoViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
-            _videoViewModel = new MyVideoViewModel();
-            this.DataContext = _videoViewModel;
+
+            _mainViewModel = new MainViewModel();
+            this.DataContext = _mainViewModel;
+            //_videoViewModel = new MyVideoViewModel();
+            //this.DataContext = _videoViewModel;
         }
-        
+
+        // Camera List + Img Slider List
+        public class MainViewModel
+        {
+            public MyVideoViewModel VideoList { get; set; }
+            public VideoEditorViewModel VideoEditor { get; set; }
+
+            public MainViewModel()
+            {
+                VideoList = new MyVideoViewModel();
+                VideoEditor = new VideoEditorViewModel();
+            }
+        }
+
         // Video Object Imformation
         public class MyVideo
         {
@@ -54,6 +73,100 @@ namespace WpfApp2
                 MyVideoes.Add(new MyVideo { name = fileName});
             }
         }
+
+        // 썸네일 위치와 시간 객체
+        public class ThumbnailItem
+        {
+            public BitmapImage Image { get; set; }
+            public double TimePosition { get; set; } // 초 단위로 저장
+        }
+
+        // Img Slider
+        public class VideoEditorViewModel
+        {
+            public ObservableCollection<ThumbnailItem> Thumbnails { get; set; }
+
+            public VideoEditorViewModel()
+            {
+                Thumbnails = new ObservableCollection<ThumbnailItem>(); // UI 자동 갱신을 위한 컬렉션
+            }
+
+            public void GenerateThumbnails(string videoPath)
+            {
+                Thumbnails.Clear(); // 기존 썸네일 초기화
+                int maxThumbnails = 60; // 최대 60개 썸네일
+
+                using (var capture = new VideoCapture(videoPath))
+                {
+                    //double duration = capture.Get(CapProp.FrameCount); // 총 프레임 개수
+                    double fps = capture.Get(CapProp.Fps); // 초당 프레임 수
+                    double videoLength = capture.Get(CapProp.FrameCount) / fps; // 총 영상 길이(초)
+                    double interval = Math.Max(1, videoLength / maxThumbnails); // 간격 계산
+
+                    //int interval = (int)(videoLength / 10); // 10개의 썸네일 생성
+
+
+                    for (int i = 0; i < videoLength; i++)
+                    {
+                        double timePosition = i;
+                        capture.Set(CapProp.PosMsec, timePosition * 1000); // 특정 시간으로 이동
+                        using (Mat frame = new Mat())
+                        {
+                            capture.Read(frame);
+                            if (!frame.IsEmpty)
+                            {
+                                Thumbnails.Add(new ThumbnailItem
+                                {
+                                    Image = ConvertMatToBitmapImage(frame),
+                                    TimePosition = timePosition
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            private BitmapImage ConvertMatToBitmapImage(Mat mat)
+            {
+                using (var bitmap = mat.ToBitmap())
+                {
+                    MemoryStream stream = new MemoryStream();
+                    bitmap.Save(stream, ImageFormat.Png);
+                    stream.Position = 0;
+
+                    BitmapImage image = new BitmapImage();
+                    image.BeginInit();
+                    image.StreamSource = stream;
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                    image.EndInit();
+                    return image;
+                }
+            }
+        }
+
+
+        private void sliderTimeline_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (mediaElement.Source != null)
+            {
+                mediaElement.Position = TimeSpan.FromSeconds(e.NewValue);
+            }
+        }
+
+        private void Thumbnail_Click(object sender, MouseButtonEventArgs e)
+        {
+            Image clickedImage = sender as Image;
+            if (clickedImage == null) return;
+
+            // 클릭한 썸네일의 DataContext를 가져오기
+            ThumbnailItem selectedThumbnail = clickedImage.DataContext as ThumbnailItem;
+            if (selectedThumbnail == null) return;
+
+            // 선택한 시간으로 비디오 이동
+            mediaElement.Position = TimeSpan.FromSeconds(selectedThumbnail.TimePosition);
+        }
+
+
 
         // 영상 재생과 관련된 함수들
         // (1) 영상 선택 버튼
@@ -79,7 +192,6 @@ namespace WpfApp2
                     mediaElement.Source = new Uri(openFileDialog.FileName);
                     mediaElement.Volume = sliderVolume.Value; // 볼륨 설정
 
-
                         try
                         {
                             // 파일명 추출
@@ -95,13 +207,13 @@ namespace WpfApp2
                             }
 
                             // ViewModel이 null인지 확인
-                            if (_videoViewModel == null)
+                            if (_mainViewModel.VideoList == null)
                             {
-                                _videoViewModel = new MyVideoViewModel(); // 초기화
+                            _mainViewModel.VideoList = new MyVideoViewModel(); // 초기화
                             }
 
-                            // 파일명 추가
-                            _videoViewModel.AddVideo(fileName);
+                        // 파일명 추가
+                        _mainViewModel.VideoList.AddVideo(fileName);
                             // txtFileName.Text = fileName;
 
                             // UI에 파일명 표시 (옵션)
@@ -113,7 +225,9 @@ namespace WpfApp2
                             MessageBox.Show($"오류가 발생했습니다: {ex.Message}");
                             //txtFileName.Text = "Error is coming";
                         }
-                    
+                    string videoPath = openFileDialog.FileName;
+                    _mainViewModel.VideoEditor.GenerateThumbnails(videoPath);
+
 
                     // 파일명 표시
                     //string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
