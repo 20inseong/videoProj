@@ -1,0 +1,100 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\94320\\source\\repos\\WpfApp2\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|c:\\users\\94320\\source\\repos\\wpfapp2\\wpfapp2\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|solutionrelative:wpfapp2\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|c:\\users\\94320\\source\\repos\\wpfapp2\\wpfapp2\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|solutionrelative:wpfapp2\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|c:\\users\\94320\\source\\repos\\wpfapp2\\wpfapp2\\trimvideowindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|solutionrelative:wpfapp2\\trimvideowindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|c:\\users\\94320\\source\\repos\\wpfapp2\\wpfapp2\\editfunction.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|solutionrelative:wpfapp2\\editfunction.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|c:\\users\\94320\\source\\repos\\wpfapp2\\wpfapp2\\trimvideowindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{0430F324-DA25-4F70-885D-755EE2286FAD}|WpfApp2\\WpfApp2.csproj|solutionrelative:wpfapp2\\trimvideowindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "WpfApp2\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\MainWindow.xaml",
+              "RelativeToolTip": "WpfApp2\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-02-07T04:40:50.104Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "TrimVideoWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\TrimVideoWindow.xaml.cs",
+              "RelativeDocumentMoniker": "WpfApp2\\TrimVideoWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\TrimVideoWindow.xaml.cs",
+              "RelativeToolTip": "WpfApp2\\TrimVideoWindow.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-21T12:04:02.191Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "EditFunction.cs",
+              "DocumentMoniker": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\EditFunction.cs",
+              "RelativeDocumentMoniker": "WpfApp2\\EditFunction.cs",
+              "ToolTip": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\EditFunction.cs",
+              "RelativeToolTip": "WpfApp2\\EditFunction.cs",
+              "ViewState": "AgIAAEEAAAAAAAAAAAAgwCoAAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-02-21T06:58:18.367Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "WpfApp2\\MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\MainWindow.xaml.cs",
+              "RelativeToolTip": "WpfApp2\\MainWindow.xaml.cs",
+              "ViewState": "AgIAAJ8BAAAAAAAAAAAQwKkBAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-01-13T03:17:24.485Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "TrimVideoWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\TrimVideoWindow.xaml",
+              "RelativeDocumentMoniker": "WpfApp2\\TrimVideoWindow.xaml",
+              "ToolTip": "C:\\Users\\94320\\source\\repos\\WpfApp2\\WpfApp2\\TrimVideoWindow.xaml",
+              "RelativeToolTip": "WpfApp2\\TrimVideoWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-02-21T11:54:13.19Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
