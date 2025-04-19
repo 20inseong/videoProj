@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:WpfApp2"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
         Height="800" Width="1500"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -19,7 +20,7 @@
             <RowDefinition Height="45" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-
+ 
         <!-- 타이틀바에 해당하는 공간 -->
         <Grid Grid.Row="0">
             <ui:TitleBar Grid.Row="0"
@@ -31,30 +32,86 @@
 
         <!-- 화면의 콘텐츠를 넣는 공간 -->
         <Grid Grid.Row="1">
-            <!-- Define Grid Rows -->
+            <!-- Grid Rows -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Toolbar -->
             <!-- Toolbar/Menu -->
-            <Menu Grid.Row="0" Background="#525252">
-                <MenuItem Header="File">
-                    <MenuItem Header="Add" Click="btnSelectVideo_Click"/>
-                    <MenuItem Header="Save" />
+            <Menu Grid.Row="0" Background="#525252" Foreground="White">
+                <!-- 파일 -->
+                <MenuItem Header="파일" >
+                    <MenuItem Header="새 프로젝트"/>
+                    <MenuItem Header="프로젝트 열기" Click="btnSelectVideo_Click"/>
+                    <MenuItem Header="최근 파일 열기" />
+                    <Separator/>
+                    <MenuItem Header="미디어 가져오기" />
+                    <Separator/>
+                    <MenuItem Header="프로젝트 저장" />
+                    <MenuItem Header="편집 파일 저장" />
+                    <Separator/>
+                    <MenuItem Header="렌더링" />
+                    <MenuItem Header="렌더링 파일 미리보기" />
+                    <Separator/>
+                    <MenuItem Header="프로젝트 설정" />
+                    <Separator/>
+                    <MenuItem Header="환경 설정" />
+                    <Separator/>
+                    <MenuItem Header="종료" />
                 </MenuItem>
-                <MenuItem Header="Edit">
-                    <MenuItem Header="Undo" />
-                    <MenuItem Header="Redo" />
+
+                <!-- 편집 -->
+                <MenuItem Header="편집">
+                    <MenuItem Header="되돌리기" />
+                    <MenuItem Header="다시 실행" />
+                    <Separator/>
+                    <MenuItem Header="자르기" />
+                    <MenuItem Header="복사하기" />
+                    <MenuItem Header="붙여넣기" />
+                    <MenuItem Header="삭제" />
+                    <MenuItem Header="모두 선택" />
+                    <Separator/>
                 </MenuItem>
-                <MenuItem Header="Tool" >
-                    <MenuItem Header="Trim Video" x:Name="CutVideoButton" Click="OpenTrimWindow_Click"/>
-                    <MenuItem Header="Concatenate Video" x:Name="ConcatenateVideoButton" Click="ConcatenateVideoButton_Click"/>
+
+                <!-- 도구 -->
+                <MenuItem Header="도구">
+                    <MenuItem Header="비디오">
+                        <MenuItem Header="시계 방향 90도 회전" />
+                        <MenuItem Header="시계 반대 방향 90도 회전" />
+                    </MenuItem>
+                    <MenuItem Header="오디오">
+                        <MenuItem Header="오디오 분리" />
+                        <MenuItem Header="뮤트" />
+                        <MenuItem Header="음성 텍스트 변환" />
+                    </MenuItem>
+                    <MenuItem Header="일반 스피드"/>
+                    <Separator/>
+                    <MenuItem Header="분할"/>
+                    <MenuItem Header="자르기" x:Name="CutVideoButton" Click="OpenTrimWindow_Click">
+                        <MenuItem Header="앞에 것만 남기고 삭제" />
+                        <MenuItem Header="뒤에 것만 남기고 삭제" />
+                    </MenuItem>
                 </MenuItem>
-                <MenuItem Header="View" />
-                <MenuItem Header="Inquiry" />
+
+                <!-- 보기 -->
+                <MenuItem Header="보기">
+                    <MenuItem Header="재생 / 일시 정지" />
+                    <MenuItem Header="중지" />
+                    <MenuItem Header="전체 화면 / 복원" />
+                    <Separator/>
+                    <MenuItem Header="배율" />
+                    <MenuItem Header="이동">
+                        <MenuItem Header="이전 프레임" />
+                        <MenuItem Header="다음 프레임" />
+                        <MenuItem Header="이전 클립" />
+                        <MenuItem Header="다음 클립" />
+                        <MenuItem Header="1초 이전" />
+                        <MenuItem Header="1초 다음" />
+                    </MenuItem>
+                </MenuItem>
             </Menu>
+
 
             <!-- Main Content Area -->
             <Grid Grid.Row="1" Margin="5">
@@ -75,8 +132,12 @@
                 <Border Grid.Column="0" Grid.RowSpan="2" Background="#36443d" BorderBrush="Black" BorderThickness="1">
                     <Expander Header="📹 동영상" IsExpanded="True" DataContext="{Binding}" VerticalAlignment="Top">
                         <ListBox ItemsSource="{Binding VideoList.MyVideoes}" 
-                                 DisplayMemberPath="name" 
-                                 SelectionChanged="VideoList_SelectionChanged"/>
+                                  DisplayMemberPath="name" 
+                                  AllowDrop="True"
+                                  Drop="Timeline_Drop"
+                                  DragOver="Timeline_DragOver"
+                                  PreviewMouseLeftButtonDown="VideoList_PreviewMouseLeftButtonDown"
+                                  PreviewMouseMove="VideoList_PreviewMouseMove"/>
                     </Expander>
                 </Border>
 
@@ -91,17 +152,9 @@
                             <!-- 영상 조작 UI (StackPanel) -->
                         </Grid.RowDefinitions>
 
-                        <!-- (2) 중앙 영역: Emgu CV 디코딩된 프레임을 표시 -->
+                        <!-- (2) 중앙 영역: vlcplayer로 프레임을 표시 -->
                         <Grid Grid.Row="0" Margin="5,5,5,5" Grid.ColumnSpan="2">
-                            <Image x:Name="imgDisplay" Stretch="Uniform"/>
-
-                            <!-- 오디오 재생용 MediaElement (숨김) -->
-                            <MediaElement x:Name="mediaElement"
-                              Visibility="Collapsed"
-                              LoadedBehavior="Manual"
-                              UnloadedBehavior="Manual"
-                              MediaOpened="mediaElement_MediaOpened"
-                              MediaEnded="mediaElement_MediaEnded" />
+                            <vlc:VideoView x:Name="videoView" />
                         </Grid>
 
                         <StackPanel x:Name="show_VideoBar" Orientation="Horizontal" Grid.Row="1" Margin="10,0,10,10" Visibility="Hidden" VerticalAlignment="Bottom" Grid.ColumnSpan="2">
@@ -123,6 +176,7 @@
                             IsSnapToTickEnabled="False"
                             Minimum="0"
                             PreviewMouseDown="sliderSeekBar_PreviewMouseDown"
+                            PreviewMouseUp="sliderSeekBar_PreviewMouseUp"
                             ValueChanged="sliderSeekBar_ValueChanged" />
 
                             <!-- 총 길이(마지막 탐색시간) 표시 -->
@@ -149,7 +203,11 @@
                                VerticalAlignment="Center" HorizontalAlignment="Center" />-->
                     <Grid>
                         <!-- 썸네일 프레임 리스트 -->
-                        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Auto" 
+                                      AllowDrop="True" 
+                                      Drop="Timeline_Drop" 
+                                      DragOver="Timeline_DragOver" 
+                                      Background="Transparent">
                             <ItemsControl ItemsSource="{Binding VideoEditor.Thumbnails}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>

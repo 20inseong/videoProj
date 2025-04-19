@@ -11,29 +11,65 @@ using System.Windows.Controls;
 using System.Collections.ObjectModel;
 using System.Drawing.Imaging;
 using System.IO;
+using LibVLCSharp.Shared;
+using System.Diagnostics;
+using System.Windows.Media;
 
 namespace WpfApp2
 {
     public partial class MainWindow : Window
     {
-        private VideoCapture _capture;
         private DispatcherTimer _timer;
         private bool _isPlaying = false; // 재생 상태 파악 (Play/Pause 구분)
         private MainViewModel _mainViewModel;
         private EditFunction _editFunction = new EditFunction();
         private string _currentVideoPath;
         private CancellationTokenSource _cts;
-        //private MyVideoViewModel _videoViewModel;
+        private LibVLC _libVLC;
+        private LibVLCSharp.Shared.MediaPlayer _mediaPlayer;
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            HwndSource hwndSource = PresentationSource.FromVisual(this) as HwndSource;
+            hwndSource.CompositionTarget.RenderMode = RenderMode.Default; // 가능하면 하드웨어 가속 사용
+
+            // CacheMode 설정 추가 (기존 MediaElement 대신 VideoView를 사용하므로 MediaElement는 제거됨)
+        }
 
         public MainWindow()
         {
             InitializeComponent();
+            Core.Initialize();
+            _libVLC = new LibVLC();
+            _mediaPlayer = new LibVLCSharp.Shared.MediaPlayer(_libVLC);
+            videoView.MediaPlayer = _mediaPlayer;
+
+            // 이벤트 구독
+            _mediaPlayer.LengthChanged += MediaPlayer_LengthChanged;
+
+
+            CvInvoke.UseOpenCL = true; // OpenCL 활성화, GPU 가속 (편집/썸네일 생성용)
 
             _mainViewModel = new MainViewModel();
             this.DataContext = _mainViewModel;
-            //_videoViewModel = new MyVideoViewModel();
-            //this.DataContext = _videoViewModel;
         }
+
+        // taskbar제외 화면 길이 구하기
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Maximized)
+            {
+                MaxHeight = SystemParameters.WorkArea.Height + 1;
+                MaxWidth = SystemParameters.WorkArea.Width + 1;
+            }
+            else
+            {
+                MaxHeight = double.PositiveInfinity;
+                MaxWidth = double.PositiveInfinity;
+            }
+        }
+
 
         // Camera List + Img Slider List
         public class MainViewModel
@@ -162,102 +198,10 @@ namespace WpfApp2
             }
         }
 
-        // 영상 바꾸는 함수
-        private void VideoList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.AddedItems.Count > 0)
-            {
-                MyVideo selectedVideo = (MyVideo)e.AddedItems[0];
-
-                if (File.Exists(selectedVideo.FullPath))
-                {
-                    // 현재 선택된 비디오 경로를 _currentVideoPath에 저장
-                    SetCurrentVideoPath(selectedVideo.FullPath);
-
-                    // 기존 VideoCapture 객체 해제
-                    _capture?.Dispose();
-                    _capture = new VideoCapture(selectedVideo.FullPath, VideoCapture.API.Any);
-
-                    // 기존 타이머 멈추기 (이전 영상의 잔여 타이머 제거)
-                    _timer?.Stop();
-
-                    // MediaElement의 영상 변경
-                    mediaElement.Source = new Uri(selectedVideo.FullPath);
-                    mediaElement.Position = TimeSpan.Zero; // 첫 장면으로 이동
-                    mediaElement.Pause();
-                    _isPlaying = false;
-                    btnPlayPause.Content = "▶"; // 재생 버튼 초기화
-
-                    // 새로운 비디오의 섬네일 생성 🔥
-                    _mainViewModel.VideoEditor.GenerateThumbnails(selectedVideo.FullPath);
-
-                    // 영상 길이 가져와서 슬라이더 값 업데이트
-                    if (_capture != null)
-                    {
-                        double fps = _capture.Get(CapProp.Fps);
-                        double totalFrames = _capture.Get(CapProp.FrameCount);
-                        double videoLength = totalFrames / fps; // 총 길이(초)
-
-                        sliderSeekBar.Value = 0; // 재생 위치 초기화
-                        sliderSeekBar.Maximum = videoLength; // 슬라이더 최대 길이 업데이트
-                        txtCurrentTime.Text = "00:00:00"; // 현재 시간 초기화
-                        txtTotalTime.Text = FormatTime(videoLength); // 총 길이 표시
-                    }
-
-                    // 새로운 비디오의 첫 번째 프레임 표시
-                    using (Mat frame = new Mat())
-                    {
-                        _capture.Read(frame);
-                        if (!frame.IsEmpty)
-                        {
-                            imgDisplay.Source = ToBitmapSource(frame);
-                        }
-                    }
-
-                    // 타이머 다시 시작
-                    _timer?.Start();
-                }
-                else
-                {
-                    MessageBox.Show("선택한 파일을 찾을 수 없습니다.");
-                }
-            }
-        }
-
-
-
-        //private void sliderTimeline_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        //{
-        //    if (mediaElement.Source != null)
-        //    {
-        //        mediaElement.Position = TimeSpan.FromSeconds(e.NewValue);
-        //    }
-        //}
-
-        // 섬네일 클릭 시, 해당 장면으로 전환
-        //private void Thumbnail_Click(object sender, MouseButtonEventArgs e)
-        //{
-        //    Image clickedImage = sender as Image;
-        //    if (clickedImage == null) return;
-
-        //    // 클릭한 썸네일의 DataContext를 가져오기
-        //    ThumbnailItem selectedThumbnail = clickedImage.DataContext as ThumbnailItem;
-        //    if (selectedThumbnail == null) return;
-
-        //    // 선택한 시간으로 비디오 이동
-        //    mediaElement.Position = TimeSpan.FromSeconds(selectedThumbnail.TimePosition);
-
-        //    mediaElement.Pause();
-
-        //}
-
-
-
         // 영상 재생과 관련된 함수들
         // (1) 영상 선택 버튼
-        private void btnSelectVideo_Click(object sender, RoutedEventArgs e)
+        private async void btnSelectVideo_Click(object sender, RoutedEventArgs e)
         {
-
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
                 Filter = "비디오 파일|*.mp4;*.avi;*.mov;*.wmv;*.mkv|모든 파일|*.*",
@@ -266,32 +210,22 @@ namespace WpfApp2
 
             if (openFileDialog.ShowDialog() == true)
             {
-                //// 기존 자원 해제
-                //_capture?.Dispose();
 
                 foreach (string videoPath in openFileDialog.FileNames) // 여러 개의 파일 처리
                 {
                     try
                     {
-                        // Emgu CV로 영상 디코딩
-                        _capture = new VideoCapture(openFileDialog.FileName, VideoCapture.API.Any);
-
-                        // MediaElement로 오디오 재생
-                        mediaElement.Source = new Uri(openFileDialog.FileName);
-                        mediaElement.Volume = sliderVolume.Value; // 볼륨 설정
-
                         try
                         {
                             // 파일명 추출
                             string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
-                            _mainViewModel.VideoEditor.GenerateThumbnails(videoPath);
 
                             // 파일명이 유효한지 확인
                             if (string.IsNullOrEmpty(fileName))
                             {
                                 MessageBox.Show("파일을 선택하지 않았습니다.");
                                 //txtFileName.Text = "Why so serious?";
-                                return;
+                                continue;
                             }
 
                             // ViewModel이 null인지 확인
@@ -300,48 +234,43 @@ namespace WpfApp2
                                 _mainViewModel.VideoList = new MyVideoViewModel(); // 초기화
                             }
 
+                            // 썸네일 생성 및 VideoList에 추가
                             _mainViewModel.VideoList.AddVideo(fileName, videoPath);
                         }
                         catch (Exception ex)
                         {
                             // 예외 처리 (로그 기록 또는 사용자 알림)
                             MessageBox.Show($"오류가 발생했습니다: {ex.Message}");
+                            continue;
                             //txtFileName.Text = "Error is coming";
                         }
 
+                        //// LibVLCSharp로 영상 재생: Media 생성 시 FromType.FromPath 사용
+                        //var media = new Media(_libVLC, videoPath, FromType.FromPath);
+                        //await media.Parse(MediaParseOptions.ParseLocal); // ← 이걸 해야 Length 정보가 정확해짐
+                        //_mediaPlayer.Media = media;
+                        //_mediaPlayer.Play(); //play를 해줘야 영상길이를 알 수 있음.
+                        //_mediaPlayer.Pause();
+                        //Debug.WriteLine("영상 길이(ms): " + _mediaPlayer.Length);
+                        //Debug.WriteLine("media.Duration(ms): " + media.Duration);
 
-                        // 파일명 표시
-                        //string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
-                        //_videoViewModel.AddVideo(fileName);
-                        // txtFileName.Text = System.IO.Path.GetFileName(openFileDialog.FileName);
+                        //_isPlaying = false;
+                        //btnPlayPause.Content = "▶"; // 재생 아이콘
+                        //_mediaPlayer.Volume = (int)(sliderVolume.Value * 100);
+                        //show_VideoBar.Visibility = Visibility.Visible;
 
-                        // 타이머 (약 30fps)
-                        if (_timer == null)
-                        {
-                            _timer = new DispatcherTimer();
-                            _timer.Interval = TimeSpan.FromMilliseconds(33);
-                            _timer.Tick += Timer_Tick;
-                        }
+                        //// 비디오 길이 설정
+                        //if (_mediaPlayer.Length > 0)
+                        //{
+                        //    double videoLength = _mediaPlayer.Length / 1000.0; // 밀리초를 초로 변환
+                        //    sliderSeekBar.Maximum = videoLength;
+                        //    Console.WriteLine($"Video Length: {videoLength}");
+                        //    sliderSeekBar.Value = 0; // 슬라이더 초기화
+                        //    txtTotalTime.Text = FormatTime(videoLength);
+                        //    txtCurrentTime.Text = "00:00:00";
+                        //}
 
-                        // 비디오 작동바 가시화
-                        show_VideoBar.Visibility = Visibility.Visible;
 
-                        // 재생 시작(수정 -> 첫 장면에서 일시정지)
-                        mediaElement.Position = TimeSpan.Zero; // 첫 프레임으로 이동
-                        mediaElement.Pause();
-                        _isPlaying = false;
-                        btnPlayPause.Content = "▶"; // 재생 아이콘
-                        _timer.Start();
-
-                        // 첫 번째 프레임을 imgDisplay에 표시
-                        using (Mat frame = new Mat())
-                        {
-                            _capture.Read(frame);
-                            if (!frame.IsEmpty)
-                            {
-                                imgDisplay.Source = ToBitmapSource(frame);
-                            }
-                        }
                         SetCurrentVideoPath(videoPath);
                     }
                     catch (Exception ex)
@@ -352,15 +281,99 @@ namespace WpfApp2
             }
         }
 
-        // (2) 미디어가 로드된 후(오디오/비디오 길이 알 수 있음)
-        private void mediaElement_MediaOpened(object sender, RoutedEventArgs e)
+        // 드래그 데이터 생성
+        private Point _dragStartPoint;
+        private void VideoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (mediaElement.NaturalDuration.HasTimeSpan)
+            _dragStartPoint = e.GetPosition(null);
+        }
+
+        private void VideoList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
             {
-                double totalSec = mediaElement.NaturalDuration.TimeSpan.TotalSeconds;
+                Point mousePos = e.GetPosition(null);
+                Vector diff = _dragStartPoint - mousePos;
+
+                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                {
+                    ListBox listBox = sender as ListBox;
+                    if (listBox == null) return;
+
+                    var selectedVideo = listBox.SelectedItem as MyVideo;
+                    if (selectedVideo != null)
+                    {
+                        DataObject dragData = new DataObject("MyVideo", selectedVideo);
+                        DragDrop.DoDragDrop(listBox, dragData, DragDropEffects.Copy);
+                    }
+                }
+            }
+        }
+
+
+        // 카메라 리스트에서 타임라인으로 Drag & Drop
+        private async void Timeline_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent("MyVideo"))
+            {
+                var video = e.Data.GetData("MyVideo") as MyVideo;
+                if (video != null)
+                {
+                    // 썸네일 생성
+                    _mainViewModel.VideoEditor.GenerateThumbnails(video.FullPath);
+
+                    // 영상 화면에 표시
+                    var media = new Media(_libVLC, video.FullPath, FromType.FromPath);
+                    await media.Parse(MediaParseOptions.ParseLocal); // 비동기 파싱, 필요시
+                    _mediaPlayer.Media = media;
+                    _mediaPlayer.Pause();
+                    SetCurrentVideoPath(video.FullPath);
+
+
+                    show_VideoBar.Visibility = Visibility.Visible;
+
+                    // 타이머 시작
+                    if (_timer == null)
+                    {
+                        _timer = new DispatcherTimer();
+                        _timer.Interval = TimeSpan.FromMilliseconds(33);
+                        _timer.Tick += Timer_Tick;
+                    }
+                    _timer.Stop();
+                }
+            }
+        }
+
+        // DragOver
+        private void Timeline_DragOver(object sender, DragEventArgs e)
+        {
+            // "MyVideo" 타입의 데이터가 드래그 중이면 복사 가능 효과 표시
+            if (e.Data.GetDataPresent("MyVideo"))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true; // 이벤트가 처리됨을 명시
+        }
+
+
+
+        // 미디어가 로드된 후(오디오/비디오 길이 알 수 있음)
+        private void MediaPlayer_LengthChanged(object sender, MediaPlayerLengthChangedEventArgs e)
+        {
+            // e.Length는 밀리초 단위(long)
+            double totalSec = e.Length / 1000.0;
+
+            // UI 스레드에서 실행 필요 (Dispatcher 사용)
+            Dispatcher.Invoke(() =>
+            {
                 sliderSeekBar.Maximum = totalSec;
                 txtTotalTime.Text = FormatTime(totalSec);
-            }
+            });
         }
 
         // (3) 미디어가 끝까지 재생된 경우
@@ -373,41 +386,38 @@ namespace WpfApp2
         // (4) 재생/일시정지 버튼
         private void btnPlayPause_Click(object sender, RoutedEventArgs e)
         {
-            if (mediaElement.Source == null) return; // 파일이 없는 경우 무시
+            if (_mediaPlayer == null) return; // 파일이 없는 경우 무시
 
             if (_isPlaying)
             {
-                // 현재 재생 중이면 -> 일시정지
-                mediaElement.Pause();
+                _mediaPlayer.Pause();
                 _isPlaying = false;
                 btnPlayPause.Content = "▶";
+                _timer.Stop();
             }
             else
             {
-                // 일시정지 상태면 -> 재생
-                mediaElement.Play();
+                _mediaPlayer.Play();
                 _isPlaying = true;
                 btnPlayPause.Content = "❚❚";
+                _timer?.Start();
             }
         }
 
         // (5) 정지 버튼
         private void btnStop_Click(object sender, RoutedEventArgs e)
         {
-            if (mediaElement.Source == null) return;
+            if (_mediaPlayer == null) return;
             StopPlayback();
         }
 
         // 정지 로직(미디어/캡처 위치를 0으로, 타이머 진행도 멈춤)
         private void StopPlayback()
         {
-            mediaElement.Stop();
-            mediaElement.Position = TimeSpan.Zero;
+            _mediaPlayer.Stop();
             sliderSeekBar.Value = 0;
             txtCurrentTime.Text = "00:00:00";
 
-            _capture?.Set(CapProp.PosMsec, 0);
-            imgDisplay.Source = null;
 
             _isPlaying = false;
             btnPlayPause.Content = "▶";
@@ -420,70 +430,50 @@ namespace WpfApp2
         // (6) 타이머: 오디오 재생 위치에 맞춰 영상도 디코딩
         private void Timer_Tick(object sender, EventArgs e)
         {
-            if (_capture == null || !_isPlaying) return;
+            if (_mediaPlayer == null || !_isPlaying) return;
+            if (_isSeeking) return; // 사용자가 슬라이더 조작 중이면 건너뜀
 
-            double currentSec = mediaElement.Position.TotalSeconds;
+            double currentSec = _mediaPlayer.Time / 1000.0;
             sliderSeekBar.Value = currentSec;
             txtCurrentTime.Text = FormatTime(currentSec);
-
-            // 영상도 동일 시각으로
-            _capture.Set(CapProp.PosMsec, currentSec * 1000.0);
-
-            using (Mat frame = new Mat())
-            {
-                _capture.Read(frame);
-                if (!frame.IsEmpty)
-                {
-                    imgDisplay.Source = ToBitmapSource(frame);
-                }
-            }
         }
+
+
 
         // (7) 슬라이더를 클릭했을 때, 해당 위치로 즉시 이동
+        private bool _isSeeking = false;
         private void sliderSeekBar_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            var slider = (System.Windows.Controls.Slider)sender;
-            var clickPoint = e.GetPosition(slider);
-
-            double ratio = clickPoint.X / slider.ActualWidth;
-            if (ratio < 0) ratio = 0;
-            if (ratio > 1) ratio = 1;
-
-            double newValue = slider.Minimum + (slider.Maximum - slider.Minimum) * ratio;
-            slider.Value = newValue;
-
-            // 기본 드래그 동작 방지
-            e.Handled = true;
+            _isSeeking = true;
         }
+
+        private void sliderSeekBar_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isSeeking = false;
+            if (_mediaPlayer != null)
+                _mediaPlayer.Time = (long)(sliderSeekBar.Value * 1000);
+        }
+
 
         // (8) 슬라이더 값이 바뀌면 -> 오디오/영상 위치도 이동
         private void sliderSeekBar_ValueChanged(object sender,
             System.Windows.RoutedPropertyChangedEventArgs<double> e)
         {
-            if (mediaElement.Source == null) return;
-            if (!_isPlaying) return; // 재생 중일 때만 동기화
-
-            mediaElement.Position = TimeSpan.FromSeconds(sliderSeekBar.Value);
-            _capture?.Set(CapProp.PosMsec, sliderSeekBar.Value * 1000.0);
-
-            //// 진행 표시(PlaybackIndicator) 위치 업데이트
-            //if (mediaElement.NaturalDuration.HasTimeSpan)
-            //{
-            //    double progressRatio = sliderSeekBar.Value / sliderSeekBar.Maximum;
-            //    double timelineWidth = sliderSeekBar.ActualWidth;
-
-            //    double newX = progressRatio * timelineWidth;
-            //    PlaybackIndicator.RenderTransform = new TranslateTransform(newX, 0);
-            //}
+            if (_mediaPlayer == null) return;
+            if (_isSeeking)
+            {
+                _mediaPlayer.Time = (long)(sliderSeekBar.Value * 1000);
+                txtCurrentTime.Text = FormatTime(sliderSeekBar.Value);
+            }
         }
 
         // (9) 볼륨 조절 (0~1)
         private void sliderVolume_ValueChanged(object sender,
             System.Windows.RoutedPropertyChangedEventArgs<double> e)
         {
-            if (mediaElement != null)
+            if (_mediaPlayer != null)
             {
-                mediaElement.Volume = sliderVolume.Value;
+                _mediaPlayer.Volume = (int)(sliderVolume.Value * 100);
             }
         }
 
@@ -518,18 +508,18 @@ namespace WpfApp2
         protected override void OnClosed(EventArgs e)
         {
             _timer?.Stop();
-            _capture?.Dispose();
-            mediaElement?.Stop();
-            mediaElement.Source = null;
+            _mediaPlayer?.Stop();
+            _mediaPlayer?.Dispose();
+            _libVLC?.Dispose();
             base.OnClosed(e);
         }
 
         private void OpenTrimWindow_Click(object sender, RoutedEventArgs e)
         {
             // 현재 비디오가 선택되지 않았다면, 현재 재생 중인 파일 경로를 설정
-            if (string.IsNullOrEmpty(_currentVideoPath) && mediaElement.Source != null)
+            if (string.IsNullOrEmpty(_currentVideoPath) && _mediaPlayer != null)
             {
-                SetCurrentVideoPath(mediaElement.Source.LocalPath);
+                SetCurrentVideoPath(_mediaPlayer.Media.Mrl);
             }
 
             // 비디오 파일이 없으면 경고 메시지 출력
@@ -580,54 +570,51 @@ namespace WpfApp2
             }
         }
 
+        //// 영상 잇는 함수
+        //private async void ConcatenateVideoButton_Click(object sender, RoutedEventArgs e)
+        //{
+        //    if (string.IsNullOrEmpty(_currentVideoPath))
+        //    {
+        //        MessageBox.Show("먼저 첫 번째 영상을 선택해주세요.", "오류");
+        //        return;
+        //    }
 
-        // 영상 잇는 함수
-        private async void ConcatenateVideoButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_currentVideoPath))
-            {
-                MessageBox.Show("먼저 첫 번째 영상을 선택해주세요.", "오류");
-                return;
-            }
+        //    OpenFileDialog openFileDialog = new OpenFileDialog
+        //    {
+        //        Filter = "비디오 파일|*.mp4;*.avi;*.mov;*.wmv;*.mkv|모든 파일|*.*"
+        //    };
 
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "비디오 파일|*.mp4;*.avi;*.mov;*.wmv;*.mkv|모든 파일|*.*"
-            };
+        //    if (openFileDialog.ShowDialog() == true)
+        //    {
+        //        string secondVideoPath = openFileDialog.FileName;
+        //        string outputFile = System.IO.Path.Combine(
+        //            System.IO.Path.GetDirectoryName(_currentVideoPath),
+        //            $"concatenated_{System.IO.Path.GetFileName(_currentVideoPath)}");
 
-            if (openFileDialog.ShowDialog() == true)
-            {
-                string secondVideoPath = openFileDialog.FileName;
-                string outputFile = System.IO.Path.Combine(
-                    System.IO.Path.GetDirectoryName(_currentVideoPath),
-                    $"concatenated_{System.IO.Path.GetFileName(_currentVideoPath)}");
+        //        try
+        //        {
+        //            ConcatenateVideoButton.IsEnabled = false;
+        //            _cts = new CancellationTokenSource();
+        //            var progress = new Progress<string>(s => StatusTextBlock.Text = s);
 
-                try
-                {
-                    ConcatenateVideoButton.IsEnabled = false;
-                    _cts = new CancellationTokenSource();
-                    var progress = new Progress<string>(s => StatusTextBlock.Text = s);
+        //            await Task.Run(() => _editFunction.ConcatenateVideos(_currentVideoPath, secondVideoPath, outputFile, progress, _cts.Token));
 
-                    await Task.Run(() => _editFunction.ConcatenateVideos(_currentVideoPath, secondVideoPath, outputFile, progress, _cts.Token));
-
-                    MessageBox.Show("영상 이어붙이기가 완료되었습니다!", "성공");
-                }
-                catch (OperationCanceledException)
-                {
-                    MessageBox.Show("작업이 취소되었습니다.", "취소됨");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"오류: {ex.Message}", "오류");
-                }
-                finally
-                {
-                    ConcatenateVideoButton.IsEnabled = true;
-                    _cts?.Dispose();
-                }
-            }
-        }
-
-
+        //            MessageBox.Show("영상 이어붙이기가 완료되었습니다!", "성공");
+        //        }
+        //        catch (OperationCanceledException)
+        //        {
+        //            MessageBox.Show("작업이 취소되었습니다.", "취소됨");
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            MessageBox.Show($"오류: {ex.Message}", "오류");
+        //        }
+        //        finally
+        //        {
+        //            ConcatenateVideoButton.IsEnabled = true;
+        //            _cts?.Dispose();
+        //        }
+        //    }
+        //}
     }
 }

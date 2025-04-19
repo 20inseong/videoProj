@@ -63,6 +63,14 @@
               "target": "Package",
               "version": "[4.10.0.5680, )"
             },
+            "LibVLCSharp.WPF": {
+              "target": "Package",
+              "version": "[3.9.3, )"
+            },
+            "VideoLAN.LibVLC.Windows": {
+              "target": "Package",
+              "version": "[3.0.21, )"
+            },
             "WPF-UI": {
               "target": "Package",
               "version": "[4.0.0, )"
