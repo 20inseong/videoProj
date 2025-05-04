@@ -10,7 +10,7 @@
         Background="#2B2B2B"
         ResizeMode="CanResizeWithGrip"
         WindowState="Normal">
-
+    
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="30" ResizeBorderThickness="5" />
     </WindowChrome.WindowChrome>
@@ -194,21 +194,43 @@
                 <Border Grid.Column="2" Grid.Row="0" Background="#36443d" BorderBrush="Black" BorderThickness="1">
                     <TextBlock Text="상태 표시" x:Name="StatusTextBlock" Foreground="White" 
                                 VerticalAlignment="Center" HorizontalAlignment="Center" />
-                    
+
                 </Border>
 
-                <!-- 영상 길이 -->
-                <Border Grid.Column="1" Grid.Row="1" Grid.ColumnSpan="2" Background="#525252" BorderBrush="Black" BorderThickness="1">
-                    <!--<TextBlock Text="영상 길이" Foreground="White" 
-                               VerticalAlignment="Center" HorizontalAlignment="Center" />-->
+                 <!--영상 길이--> 
+                <Border Grid.Column="1" Grid.Row="1" Grid.ColumnSpan="2" 
+                        Background="#525252" 
+                        BorderBrush="Black" 
+                        BorderThickness="1">
                     <Grid>
-                        <!-- 썸네일 프레임 리스트 -->
-                        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Auto" 
-                                      AllowDrop="True" 
-                                      Drop="Timeline_Drop" 
-                                      DragOver="Timeline_DragOver" 
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <ScrollViewer x:Name="RulerScrollViewer"
+                                      Grid.Row="0"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      HorizontalScrollBarVisibility="Hidden">
+                            <Canvas x:Name="TimelineRulerCanvas"
+                                    Height="40"
+                                    IsHitTestVisible="False"/>
+                        </ScrollViewer>
+
+                        <Canvas x:Name="PlayheadCanvas"
+                                Grid.Row="0"
+                                Panel.ZIndex="1"
+                                IsHitTestVisible="False">
+                        </Canvas>
+                        <ScrollViewer x:Name="TimelineScrollViewer"
+                                      Grid.Row="1"
+                                      ScrollChanged="TimelineScrollViewer_ScrollChanged"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      AllowDrop="True"
+                                      Drop="Timeline_Drop"
+                                      DragOver="Timeline_DragOver"
                                       Background="Transparent">
-                            <ItemsControl ItemsSource="{Binding VideoEditor.Thumbnails}">
+                            <ItemsControl x:Name="ThumbnailItemsControl" ItemsSource="{Binding VideoEditor.Thumbnails}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Orientation="Horizontal"/>
@@ -224,18 +246,6 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </Grid>
-
-                    <!-- 타임라인 진행선 & 현재 시간 표시 --><!--
-                    <Canvas x:Name="ThumbnailTimelineCanvas" IsHitTestVisible="False">
-                        --><!-- 현재 시간 표시 --><!--
-                        <TextBlock x:Name="ThumbnailTimeIndicator" Foreground="White" Background="Black" 
-                   FontSize="12" Padding="2,0,2,0" Visibility="Hidden"/>
-
-                        --><!-- 현재 재생 위치를 나타내는 세로선 --><!--
-                        <Line x:Name="ThumbnailTimeMarker" Stroke="Red" StrokeThickness="2"
-              X1="0" X2="0" Y1="0" Y2="160" Visibility="Hidden"/>
-                    </Canvas>-->
-
                 </Border>
             </Grid>
         </Grid>

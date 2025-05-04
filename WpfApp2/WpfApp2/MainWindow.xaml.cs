@@ -12,8 +12,8 @@ using System.Collections.ObjectModel;
 using System.Drawing.Imaging;
 using System.IO;
 using LibVLCSharp.Shared;
-using System.Diagnostics;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace WpfApp2
 {
@@ -28,13 +28,19 @@ namespace WpfApp2
         private LibVLC _libVLC;
         private LibVLCSharp.Shared.MediaPlayer _mediaPlayer;
 
+        private const double DEFAULT_TIMELINE_SECONDS = 300; // 5분 = 300초
+        private const double PIXELS_PER_SECOND = 10; // 1초당 10픽셀 (원하는 대로 조정)
+        private double _currentVideoLengthSec = DEFAULT_TIMELINE_SECONDS; // 항상 5분으로 초기화
+
+        private Line _playheadLine; // 편집 재생선 구현 변수
+        private bool _isRendering = false;
+
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
             HwndSource hwndSource = PresentationSource.FromVisual(this) as HwndSource;
             hwndSource.CompositionTarget.RenderMode = RenderMode.Default; // 가능하면 하드웨어 가속 사용
 
-            // CacheMode 설정 추가 (기존 MediaElement 대신 VideoView를 사용하므로 MediaElement는 제거됨)
         }
 
         public MainWindow()
@@ -45,15 +51,41 @@ namespace WpfApp2
             _mediaPlayer = new LibVLCSharp.Shared.MediaPlayer(_libVLC);
             videoView.MediaPlayer = _mediaPlayer;
 
-            // 이벤트 구독
+            // 영상 길이, total time 계산
             _mediaPlayer.LengthChanged += MediaPlayer_LengthChanged;
 
 
             CvInvoke.UseOpenCL = true; // OpenCL 활성화, GPU 가속 (편집/썸네일 생성용)
 
+            
+
             _mainViewModel = new MainViewModel();
             this.DataContext = _mainViewModel;
+
+            DrawTimelineRuler();
+
+            this.SizeChanged += Window_SizeChanged; // 창 크기 변경 이벤트 연결
+
+            // 플레이헤드 초기화
+            _playheadLine = new Line
+            {
+                Stroke = Brushes.Red,
+                StrokeThickness = 2,
+                Y1 = 0,
+                Y2 = 30,
+                //Visibility = Visibility.Visible
+            };
+            //TimelineRulerCanvas.Children.Add(_playheadLine);
+            PlayheadCanvas.Children.Add(_playheadLine);
+            this.Loaded += (s, e) => UpdatePlayheadClip();
         }
+
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _playheadLine.Y2 = TimelineScrollViewer.ActualHeight;
+            UpdatePlayheadClip();
+        }
+
 
         // taskbar제외 화면 길이 구하기
         private void Window_StateChanged(object sender, EventArgs e)
@@ -126,39 +158,37 @@ namespace WpfApp2
                 Thumbnails = new ObservableCollection<ThumbnailItem>(); // UI 자동 갱신을 위한 컬렉션
             }
 
-            public void GenerateThumbnails(string videoPath)
+            public double GenerateThumbnails(string videoPath)
             {
-                Thumbnails.Clear(); // 기존 썸네일 초기화
-                int maxThumbnails = 10; // 최대 10개의 썸네일 생성 (너무 많으면 성능 저하)
+                Thumbnails.Clear();
+                int maxThumbnails = 10;
 
                 using (var capture = new VideoCapture(videoPath))
                 {
-                    double fps = capture.Get(CapProp.Fps); // 초당 프레임 수
+                    double fps = capture.Get(CapProp.Fps);
                     double totalFrames = capture.Get(CapProp.FrameCount);
-                    double videoLength = totalFrames / fps; // 영상 길이(초)
+                    double videoLength = totalFrames / fps;
 
                     if (videoLength <= 0 || fps <= 0)
                     {
                         MessageBox.Show("잘못된 비디오 파일입니다.");
-                        return;
+                        return 0;
                     }
 
-                    double interval = Math.Max(1, videoLength / maxThumbnails); // 썸네일 간격 계산
+                    // 프레임 샘플링 최적화 구간
+                    double interval = Math.Max(1, videoLength / maxThumbnails);
 
                     for (int i = 0; i < maxThumbnails; i++)
                     {
-                        double timePosition = i * interval; // 해당 초 위치로 이동
-                        capture.Set(CapProp.PosMsec, timePosition * 1000); // 특정 시간으로 이동
+                        double timePosition = i * interval;
+                        capture.Set(CapProp.PosMsec, timePosition * 1000);
 
                         using (Mat frame = new Mat())
                         {
                             capture.Read(frame);
                             if (frame.IsEmpty)
-                            {
-                                continue; // 프레임을 읽지 못하면 건너뛰기
-                            }
+                                continue;
 
-                            // 섬네일 추가
                             Thumbnails.Add(new ThumbnailItem
                             {
                                 Image = ConvertMatToBitmapImage(frame),
@@ -166,8 +196,10 @@ namespace WpfApp2
                             });
                         }
                     }
+                    return videoLength; // 영상 길이 반환
                 }
             }
+
 
             private BitmapImage ConvertMatToBitmapImage(Mat mat)
             {
@@ -188,6 +220,84 @@ namespace WpfApp2
             }
 
         }
+
+        private void DrawTimelineRuler()
+        {
+            // 영상이 없어도 항상 5분 기준으로 그림
+            double videoLength = Math.Max(_currentVideoLengthSec, DEFAULT_TIMELINE_SECONDS);
+            double totalTimelineWidth = videoLength * PIXELS_PER_SECOND;
+
+            TimelineRulerCanvas.Children.Clear();
+            TimelineRulerCanvas.Width = totalTimelineWidth;
+
+            // 썸네일 StackPanel도 동일한 폭으로 맞춤
+            if (ThumbnailItemsControl != null)
+                ThumbnailItemsControl.Width = totalTimelineWidth;
+
+            // 1초마다 얇은 선, 5초마다 굵은 선+숫자
+            for (int sec = 0; sec <= videoLength; sec++)
+            {
+                double x = sec * PIXELS_PER_SECOND;
+
+                var line = new Line
+                {
+                    X1 = x,
+                    X2 = x,
+                    Y1 = 0,
+                    Y2 = (sec % 5 == 0) ? 20 : 10, // 5초마다 더 길게
+                    Stroke = (sec % 5 == 0) ? Brushes.LightGray : Brushes.Gray,
+                    StrokeThickness = (sec % 5 == 0) ? 2 : 1
+                };
+
+                TimelineRulerCanvas.Children.Add(line);
+
+                // 5초마다 숫자 표시
+                if (sec % 5 == 0)
+                {
+                    var text = new TextBlock
+                    {
+                        Text = TimeSpan.FromSeconds(sec).ToString(@"m\:ss"),
+                        Foreground = Brushes.White,
+                        FontSize = 12
+                    };
+                    Canvas.SetLeft(text, x + 2);
+                    Canvas.SetTop(text, 20);
+                    TimelineRulerCanvas.Children.Add(text);
+                }
+            }
+        }
+
+        private void UpdatePlayheadClip()
+        {
+            double horizontalOffset = TimelineScrollViewer.HorizontalOffset;
+            var clipRect = new Rect(
+                horizontalOffset,  // 현재 스크롤 위치에서 시작
+                0,
+                TimelineScrollViewer.ViewportWidth,  // 가시 영역 너비
+                TimelineScrollViewer.ViewportHeight  // 가시 영역 높이
+            );
+
+            PlayheadCanvas.Clip = new RectangleGeometry(clipRect);
+        }
+
+        //private void UpdatePlayheadPosition(double currentSec)
+        //{
+        //    double maxX = _currentVideoLengthSec * PIXELS_PER_SECOND;
+        //    double x = Math.Max(0, Math.Min(currentSec * PIXELS_PER_SECOND, maxX));
+        //    _playheadLine.X1 = x;
+        //    _playheadLine.X2 = x;
+        //}
+
+
+        private void TimelineScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            double maxOffset = TimelineRulerCanvas.ActualWidth - TimelineScrollViewer.ViewportWidth;
+            double clampedOffset = Math.Clamp(e.HorizontalOffset, 0, maxOffset);
+            TimelineRulerCanvas.Margin = new Thickness(-e.HorizontalOffset, 0, 0, 0);
+            PlayheadCanvas.Margin = new Thickness(-e.HorizontalOffset, 0, 0, 0);
+            UpdatePlayheadClip();
+        }
+
 
         // 선택한 영상 파일 경로 저장 함수
         private void SetCurrentVideoPath(string videoPath)
@@ -210,7 +320,6 @@ namespace WpfApp2
 
             if (openFileDialog.ShowDialog() == true)
             {
-
                 foreach (string videoPath in openFileDialog.FileNames) // 여러 개의 파일 처리
                 {
                     try
@@ -236,6 +345,7 @@ namespace WpfApp2
 
                             // 썸네일 생성 및 VideoList에 추가
                             _mainViewModel.VideoList.AddVideo(fileName, videoPath);
+                            SetCurrentVideoPath(videoPath);
                         }
                         catch (Exception ex)
                         {
@@ -244,32 +354,6 @@ namespace WpfApp2
                             continue;
                             //txtFileName.Text = "Error is coming";
                         }
-
-                        //// LibVLCSharp로 영상 재생: Media 생성 시 FromType.FromPath 사용
-                        //var media = new Media(_libVLC, videoPath, FromType.FromPath);
-                        //await media.Parse(MediaParseOptions.ParseLocal); // ← 이걸 해야 Length 정보가 정확해짐
-                        //_mediaPlayer.Media = media;
-                        //_mediaPlayer.Play(); //play를 해줘야 영상길이를 알 수 있음.
-                        //_mediaPlayer.Pause();
-                        //Debug.WriteLine("영상 길이(ms): " + _mediaPlayer.Length);
-                        //Debug.WriteLine("media.Duration(ms): " + media.Duration);
-
-                        //_isPlaying = false;
-                        //btnPlayPause.Content = "▶"; // 재생 아이콘
-                        //_mediaPlayer.Volume = (int)(sliderVolume.Value * 100);
-                        //show_VideoBar.Visibility = Visibility.Visible;
-
-                        //// 비디오 길이 설정
-                        //if (_mediaPlayer.Length > 0)
-                        //{
-                        //    double videoLength = _mediaPlayer.Length / 1000.0; // 밀리초를 초로 변환
-                        //    sliderSeekBar.Maximum = videoLength;
-                        //    Console.WriteLine($"Video Length: {videoLength}");
-                        //    sliderSeekBar.Value = 0; // 슬라이더 초기화
-                        //    txtTotalTime.Text = FormatTime(videoLength);
-                        //    txtCurrentTime.Text = "00:00:00";
-                        //}
-
 
                         SetCurrentVideoPath(videoPath);
                     }
@@ -320,20 +404,24 @@ namespace WpfApp2
                 var video = e.Data.GetData("MyVideo") as MyVideo;
                 if (video != null)
                 {
-                    // 썸네일 생성
-                    _mainViewModel.VideoEditor.GenerateThumbnails(video.FullPath);
+                    // 썸네일 생성 및 영상 길이 얻기
+                    double videoLength = _mainViewModel.VideoEditor.GenerateThumbnails(video.FullPath);
+
+
+                    _currentVideoLengthSec = Math.Max(DEFAULT_TIMELINE_SECONDS, videoLength);
+
+                    // 눈금자 즉시 갱신
+                    DrawTimelineRuler();
 
                     // 영상 화면에 표시
                     var media = new Media(_libVLC, video.FullPath, FromType.FromPath);
-                    await media.Parse(MediaParseOptions.ParseLocal); // 비동기 파싱, 필요시
+                    await media.Parse(MediaParseOptions.ParseLocal);
                     _mediaPlayer.Media = media;
                     _mediaPlayer.Pause();
                     SetCurrentVideoPath(video.FullPath);
 
-
                     show_VideoBar.Visibility = Visibility.Visible;
 
-                    // 타이머 시작
                     if (_timer == null)
                     {
                         _timer = new DispatcherTimer();
@@ -344,6 +432,7 @@ namespace WpfApp2
                 }
             }
         }
+
 
         // DragOver
         private void Timeline_DragOver(object sender, DragEventArgs e)
@@ -367,12 +456,14 @@ namespace WpfApp2
         {
             // e.Length는 밀리초 단위(long)
             double totalSec = e.Length / 1000.0;
+            _currentVideoLengthSec = totalSec; // 추가
 
             // UI 스레드에서 실행 필요 (Dispatcher 사용)
             Dispatcher.Invoke(() =>
             {
                 sliderSeekBar.Maximum = totalSec;
                 txtTotalTime.Text = FormatTime(totalSec);
+                DrawTimelineRuler(); // 영상 길이 바뀔 때마다 눈금자 갱신
             });
         }
 
@@ -394,6 +485,11 @@ namespace WpfApp2
                 _isPlaying = false;
                 btnPlayPause.Content = "▶";
                 _timer.Stop();
+                if (_isRendering)
+                {
+                    CompositionTarget.Rendering -= OnRendering;
+                    _isRendering = false;
+                }
             }
             else
             {
@@ -401,13 +497,43 @@ namespace WpfApp2
                 _isPlaying = true;
                 btnPlayPause.Content = "❚❚";
                 _timer?.Start();
+                if (!_isRendering)
+                {
+                    CompositionTarget.Rendering += OnRendering;
+                    _isRendering = true;
+                }
             }
+        }
+
+        private void OnRendering(object sender, EventArgs e)
+        {
+            if (_mediaPlayer == null || !_isPlaying) return;
+
+            double currentSec = _mediaPlayer.Time / 1000.0;
+            double maxX = _currentVideoLengthSec * PIXELS_PER_SECOND; // 최대 이동 범위 계산
+
+            // X 좌표 제한 (0 ~ 최대 길이)
+            double x = Math.Clamp(currentSec * PIXELS_PER_SECOND, 0, maxX);
+
+            _playheadLine.X1 = x;
+            _playheadLine.X2 = x;
+
+            sliderSeekBar.Value = currentSec;
+            txtCurrentTime.Text = FormatTime(currentSec);
         }
 
         // (5) 정지 버튼
         private void btnStop_Click(object sender, RoutedEventArgs e)
         {
             if (_mediaPlayer == null) return;
+
+            // 렌더링 이벤트 해제
+            if (_isRendering)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _isRendering = false;
+            }
+
             StopPlayback();
         }
 
@@ -417,14 +543,19 @@ namespace WpfApp2
             _mediaPlayer.Stop();
             sliderSeekBar.Value = 0;
             txtCurrentTime.Text = "00:00:00";
-
-
             _isPlaying = false;
             btnPlayPause.Content = "▶";
 
-            // 필요하다면 _timer는 계속 돌리거나, 멈출 수 있음
-            // 여기서는 일단 계속 돌려서 업데이트 하도록 둠
-            // _timer.Stop();
+            // 플레이헤드 위치 초기화
+            _playheadLine.X1 = 0;
+            _playheadLine.X2 = 0;
+
+            // 렌더링 이벤트 해제
+            if (_isRendering)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _isRendering = false;
+            }
         }
 
         // (6) 타이머: 오디오 재생 위치에 맞춰 영상도 디코딩
@@ -436,6 +567,11 @@ namespace WpfApp2
             double currentSec = _mediaPlayer.Time / 1000.0;
             sliderSeekBar.Value = currentSec;
             txtCurrentTime.Text = FormatTime(currentSec);
+
+            // 플레이헤드 위치 업데이트
+            double currentX = currentSec * PIXELS_PER_SECOND;
+            _playheadLine.X1 = currentX;
+            _playheadLine.X2 = currentX;
         }
 
 
@@ -507,6 +643,12 @@ namespace WpfApp2
         // 창 종료 시 자원 정리
         protected override void OnClosed(EventArgs e)
         {
+            // 렌더링 이벤트 해제 추가
+            if (_isRendering)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+            }
+
             _timer?.Stop();
             _mediaPlayer?.Stop();
             _mediaPlayer?.Dispose();
@@ -534,8 +676,6 @@ namespace WpfApp2
             trimWindow.Owner = this;
             trimWindow.ShowDialog();
         }
-
-
 
         public async void TrimVideoFromUI(TimeSpan startTime, TimeSpan endTime)
         {
