@@ -85,7 +85,7 @@
                         <MenuItem Header="뮤트" />
                         <MenuItem Header="음성 텍스트 변환" />
                     </MenuItem>
-                    <MenuItem Header="일반 스피드"/>
+                    <MenuItem Header="배속" x:Name="SpeedMenuItem" Click="SpeedMenuItem_Click"/>
                     <Separator/>
                     <MenuItem Header="분할"/>
                     <MenuItem Header="자르기" x:Name="CutVideoButton" Click="OpenTrimWindow_Click">
@@ -192,9 +192,40 @@
 
                 <!--- 영상 설정 -->
                 <Border Grid.Column="2" Grid.Row="0" Background="#36443d" BorderBrush="Black" BorderThickness="1">
+                    <Grid>
                     <TextBlock Text="상태 표시" x:Name="StatusTextBlock" Foreground="White" 
                                 VerticalAlignment="Center" HorizontalAlignment="Center" />
 
+                        <!-- 배속 컨트롤 패널 -->
+                        <StackPanel x:Name="SpeedControlPanel" Visibility="Collapsed" Margin="10">
+                            <TextBlock Text="배속 설정" FontWeight="Bold" Foreground="White" Margin="0,0,0,10" />
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                                <TextBlock Text="배속:" Foreground="White" VerticalAlignment="Center" Width="80" />
+                                <TextBox x:Name="SpeedTextBox" Width="70" Text="1.0" VerticalAlignment="Center" 
+                                         KeyDown="SpeedTextBox_KeyDown" />
+                                <Button x:Name="ApplySpeedButton" Content="적용" Width="50" Margin="5,0,0,0" 
+                                        Click="ApplySpeedButton_Click" />
+                            </StackPanel>
+                            
+                            <TextBlock Text="프리셋:" Foreground="White" Margin="0,10,0,5" />
+                            <UniformGrid Columns="3" Rows="2">
+                                <Button Content="0.5x" Margin="2" Click="SpeedPreset_Click" Tag="0.5" />
+                                <Button Content="0.75x" Margin="2" Click="SpeedPreset_Click" Tag="0.75" />
+                                <Button Content="1.0x" Margin="2" Click="SpeedPreset_Click" Tag="1.0" />
+                                <Button Content="1.25x" Margin="2" Click="SpeedPreset_Click" Tag="1.25" />
+                                <Button Content="1.5x" Margin="2" Click="SpeedPreset_Click" Tag="1.5" />
+                                <Button Content="2.0x" Margin="2" Click="SpeedPreset_Click" Tag="2.0" />
+                            </UniformGrid>
+                            
+                            <TextBlock Text="슬라이더:" Foreground="White" Margin="0,10,0,5" />
+                            <Slider x:Name="SpeedSlider" Minimum="0.25" Maximum="3.0" Value="1.0" 
+                                    TickFrequency="0.25" IsSnapToTickEnabled="True" 
+                                    ValueChanged="SpeedSlider_ValueChanged" />
+                            <TextBlock x:Name="SpeedValueText" Text="1.0x" Foreground="White" 
+                                       HorizontalAlignment="Center" Margin="0,5,0,0" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                  <!--영상 길이--> 
