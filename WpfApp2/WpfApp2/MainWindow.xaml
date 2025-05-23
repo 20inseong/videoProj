@@ -11,6 +11,12 @@
         ResizeMode="CanResizeWithGrip"
         WindowState="Normal">
     
+    <Window.Resources>
+        <local:TimeToPixelConverter x:Key="TimeToPixelConverter"/>
+        <local:DurationConverter x:Key="DurationConverter"/>
+        <local:TrackToPositionConverter x:Key="TrackToPositionConverter"/>
+    </Window.Resources>
+    
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="30" ResizeBorderThickness="5" />
     </WindowChrome.WindowChrome>
@@ -136,6 +142,7 @@
                                   AllowDrop="True"
                                   Drop="Timeline_Drop"
                                   DragOver="Timeline_DragOver"
+                                  SelectionChanged="VideoList_SelectionChanged"
                                   PreviewMouseLeftButtonDown="VideoList_PreviewMouseLeftButtonDown"
                                   PreviewMouseMove="VideoList_PreviewMouseMove"/>
                     </Expander>
@@ -194,7 +201,7 @@
                 <Border Grid.Column="2" Grid.Row="0" Background="#36443d" BorderBrush="Black" BorderThickness="1">
                     <Grid>
                     <TextBlock Text="상태 표시" x:Name="StatusTextBlock" Foreground="White" 
-                                VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,10,0,0" />
 
                         <!-- 배속 컨트롤 패널 -->
                         <StackPanel x:Name="SpeedControlPanel" Visibility="Collapsed" Margin="10">
@@ -225,6 +232,38 @@
                             <TextBlock x:Name="SpeedValueText" Text="1.0x" Foreground="White" 
                                        HorizontalAlignment="Center" Margin="0,5,0,0" />
                         </StackPanel>
+                        
+                        <!-- 영상 정보 표시 패널 -->
+                        <StackPanel x:Name="VideoInfoPanel" Margin="10,40,10,10" Visibility="Visible">
+                            <TextBlock Text="영상 정보" FontWeight="Bold" Foreground="White" Margin="0,0,0,10" />
+                            
+                            <StackPanel Margin="0,5,0,10">
+                                <TextBlock Text="파일명:" Foreground="White" FontWeight="Bold" />
+                                <TextBlock x:Name="txtFileName" Foreground="White" TextWrapping="Wrap" Margin="0,0,0,5" />
+                                
+                                <TextBlock Text="경로:" Foreground="White" FontWeight="Bold" />
+                                <TextBlock x:Name="txtFilePath" Foreground="White" TextWrapping="Wrap" Margin="0,0,0,5" />
+                                
+                                <TextBlock Text="재생 길이:" Foreground="White" FontWeight="Bold" />
+                                <TextBlock x:Name="txtDuration" Foreground="White" Margin="0,0,0,5" />
+                            </StackPanel>
+                            
+                            <TextBlock Text="카테고리:" Foreground="White" FontWeight="Bold" Margin="0,10,0,5" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <ComboBox x:Name="cmbCategory" Width="150" IsEditable="True" 
+                                          KeyDown="CategoryComboBox_KeyDown"
+                                          SelectionChanged="CategoryComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="미분류" />
+                                    <ComboBoxItem Content="감정1" />
+                                    <ComboBoxItem Content="감정2" />
+                                    <ComboBoxItem Content="감정3" />
+                                    <ComboBoxItem Content="감정4" />
+                                    <ComboBoxItem Content="감정5" />
+                                </ComboBox>
+                                <Button x:Name="btnAddCategory" Content="추가" Width="50" Margin="5,0,0,0"
+                                        Click="AddCategory_Click" />
+                            </StackPanel>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -237,9 +276,24 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
+                        
+                        <!-- 타임라인 상단 메뉴 -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5,2,5,2">
+                            <Button x:Name="btnZoomIn" Content="확대(+)" Margin="2" Click="btnZoomIn_Click"/>
+                            <Button x:Name="btnZoomOut" Content="축소(-)" Margin="2" Click="btnZoomOut_Click"/>
+                            <TextBlock Text="확대/축소: " Foreground="White" VerticalAlignment="Center" Margin="10,0,5,0"/>
+                            <TextBlock x:Name="txtZoomValue" Text="100%" Foreground="White" VerticalAlignment="Center" Width="50"/>
+                            <Button x:Name="btnSplitClip" Content="클립 분할" Margin="10,2,2,2" Click="btnSplitClip_Click"/>
+                            <Button x:Name="btnCopyClip" Content="복사" Margin="2" Click="btnCopyClip_Click"/>
+                            <Button x:Name="btnPasteClip" Content="붙여넣기" Margin="2" Click="btnPasteClip_Click"/>
+                            <Button x:Name="btnDeleteClip" Content="삭제" Margin="2" Click="btnDeleteClip_Click"/>
+                            <Button x:Name="btnExportVideo" Content="내보내기" Margin="15,2,2,2" Background="#5F9E30" Foreground="White" Click="btnExportVideo_Click"/>
+                        </StackPanel>
+                        
                         <ScrollViewer x:Name="RulerScrollViewer"
-                                      Grid.Row="0"
+                                      Grid.Row="1"
                                       VerticalScrollBarVisibility="Disabled"
                                       HorizontalScrollBarVisibility="Hidden">
                             <Canvas x:Name="TimelineRulerCanvas"
@@ -248,19 +302,23 @@
                         </ScrollViewer>
 
                         <Canvas x:Name="PlayheadCanvas"
-                                Grid.Row="0"
+                                Grid.Row="1"
                                 Panel.ZIndex="1"
                                 IsHitTestVisible="False">
                         </Canvas>
+                        
                         <ScrollViewer x:Name="TimelineScrollViewer"
-                                      Grid.Row="1"
+                                      Grid.Row="2"
                                       ScrollChanged="TimelineScrollViewer_ScrollChanged"
                                       VerticalScrollBarVisibility="Hidden"
                                       HorizontalScrollBarVisibility="Auto"
                                       AllowDrop="True"
+                                      PreviewMouseWheel="TimelineScrollViewer_PreviewMouseWheel"
                                       Drop="Timeline_Drop"
                                       DragOver="Timeline_DragOver"
                                       Background="Transparent">
+                            <Grid>
+                                <!-- 썸네일 영역 -->
                             <ItemsControl x:Name="ThumbnailItemsControl" ItemsSource="{Binding VideoEditor.Thumbnails}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
@@ -270,11 +328,59 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel>
-                                            <Image Source="{Binding Image}" Width="240" Height="160"/>
+                                                <Image Source="{Binding Image}" Width="120" Height="80"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                                
+                                <!-- 타임라인 클립 영역 -->
+                                <Canvas x:Name="TimelineClipsCanvas" Height="300" Background="#3B3B3B" MouseLeftButtonDown="TimelineClipsCanvas_MouseLeftButtonDown">
+                                    <ItemsControl x:Name="ClipsItemsControl" ItemsSource="{Binding VideoEditor.TimelineClips}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Canvas.Left" Value="{Binding StartPosition}"/>
+                                                <Setter Property="Canvas.Top" Value="{Binding TrackIndex, Converter={StaticResource TrackToPositionConverter}}"/>
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="ClipBorder" 
+                                                        Width="{Binding Width}" 
+                                                        Height="50" 
+                                                        Background="#4A6D8C" 
+                                                        BorderBrush="Black" 
+                                                        BorderThickness="1"
+                                                        MouseLeftButtonDown="Clip_MouseLeftButtonDown"
+                                                        MouseLeftButtonUp="Clip_MouseLeftButtonUp"
+                                                        MouseMove="Clip_MouseMove">
+                                                    <Grid>
+                                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.7"/>
+                                                        <TextBlock Text="{Binding Name}" 
+                                                                   Foreground="White" 
+                                                                   FontWeight="Bold" 
+                                                                   VerticalAlignment="Top" 
+                                                                   HorizontalAlignment="Left"
+                                                                   Margin="5,5,0,0"
+                                                                   Background="#4A000000"/>
+                                                        <TextBlock Text="{Binding Duration, StringFormat='{}{0:00}:{1:00}'}" 
+                                                                   Foreground="White" 
+                                                                   VerticalAlignment="Bottom" 
+                                                                   HorizontalAlignment="Right"
+                                                                   Margin="0,0,5,5"
+                                                                   Background="#4A000000"/>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Canvas>
+                            </Grid>
                         </ScrollViewer>
                     </Grid>
                 </Border>
